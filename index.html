@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Tienda - Catálogo y Búsqueda</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <div class="container py-5">
+        <!-- Encabezado -->
+        <div class="row mb-5">
+            <div class="col-12 text-center">
+                <h1 class="fw-bold text-dark">🛍️ Mi Tienda Web</h1>
+                <p class="text-muted">Gestión, búsqueda y catálogo sincronizado con Django</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Formulario para Registrar Producto -->
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow border-0 p-4">
+                    <h4 class="fw-bold mb-3 text-primary">➕ Nuevo Producto</h4>
+                    <form id="form-producto">
+                        <div class="mb-3">
+                            <label for="nombre" class="form-label">Nombre del producto</label>
+                            <input type="text" class="form-control" id="nombre" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="descripcion" class="form-label">Descripción</label>
+                            <textarea class="form-control" id="descripcion" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="precio" class="form-label">Precio ($)</label>
+                            <input type="number" step="0.01" class="form-control" id="precio" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="stock" class="form-label">Stock</label>
+                            <input type="number" class="form-control" id="stock" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Guardar Producto</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Catálogo de Productos y Buscador -->
+            <div class="col-lg-8">
+                <!-- Barra de búsqueda e interruptor de actualizar -->
+                <div class="row mb-3 align-items-center">
+                    <div class="col-md-8 mb-2 mb-md-0">
+                        <input type="text" id="input-buscador" class="form-control" placeholder="🔍 Buscar producto por nombre...">
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <button class="btn btn-outline-primary btn-sm w-100" onclick="cargarProductos()">🔄 Actualizar</button>
+                    </div>
+                </div>
+
+                <div class="row" id="contenedor-productos">
+                    <!-- Aquí se cargan dinámicamente las tarjetas -->
+                    <div class="col-12 text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de conexión, registro y filtrado -->
+    <script>
+        const API_URL = 'http://127.0.0.1:8000/api/productos/';
+        let listaGlobalProductos = []; // Guardaremos los productos aquí para filtrarlos al instante
+
+        // Función para cargar los productos desde Django
+        function cargarProductos() {
+            fetch(API_URL)
+                .then(response => response.json())
+                .then(data => {
+                    listaGlobalProductos = data; // Guardamos en memoria
+                    mostrarProductos(listaGlobalProductos);
+                })
+                .catch(error => console.error('Error al cargar productos:', error));
+        }
+
+        // Función para renderizar las tarjetas en la pantalla
+        function mostrarProductos(productos) {
+            const contenedor = document.getElementById('contenedor-productos');
+            contenedor.innerHTML = '';
+            
+            if (productos.length === 0) {
+                contenedor.innerHTML = '<div class="col-12 text-center"><p class="text-muted">No se encontraron productos.</p></div>';
+                return;
+            }
+
+            productos.forEach(producto => {
+                let tarjeta = `
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-body d-flex flex-column">
+                                <h5 class="card-title fw-bold text-primary">${producto.nombre}</h5>
+                                <p class="card-text text-muted small flex-grow-1">${producto.descripcion || 'Sin descripción.'}</p>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <span class="fs-5 fw-bold text-success">$${producto.precio}</span>
+                                    <span class="badge bg-secondary">Stock: ${producto.stock}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                contenedor.innerHTML += tarjeta;
+            });
+        }
+
+        // Evento para filtrar en tiempo real mientras escribes
+        document.getElementById('input-buscador').addEventListener('input', function(e) {
+            const textoBusqueda = e.target.value.toLowerCase();
+            const productosFiltrados = listaGlobalProductos.filter(producto => 
+                producto.nombre.toLowerCase().includes(textoBusqueda)
+            );
+            mostrarProductos(productosFiltrados);
+        });
+
+        // Función para enviar un nuevo producto mediante el formulario
+        document.getElementById('form-producto').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const nuevoProducto = {
+                nombre: document.getElementById('nombre').value,
+                descripcion: document.getElementById('descripcion').value,
+                precio: parseFloat(document.getElementById('precio').value),
+                stock: parseInt(document.getElementById('stock').value)
+            };
+
+            fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(nuevoProducto)
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('¡Producto registrado con éxito!');
+                    document.getElementById('form-producto').reset();
+                    cargarProductos();
+                } else {
+                    alert('Hubo un error al registrar el producto.');
+                }
+            })
+            .catch(error => console.error('Error en la petición POST:', error));
+        });
+
+        // Cargar productos al abrir la página
+        cargarProductos();
+    </script>
+
+</body>
+</html>
